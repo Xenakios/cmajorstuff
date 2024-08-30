@@ -1,17 +1,14 @@
 graph graindelay  [[ main ]]
 {
     input stream float<2> audio_in;
-    // input stream float audio_in_right;
     output stream float audio_out_left;
     output stream float audio_out_right;
-    input value float density [[ name: "Grain density", min: 0.0f, max: 1.0f, init: 0.5f ]];
-    input value float size [[ name: "Grain size", min: 0.0f, max: 1.0f, init: 0.5f ]];
-    input value float position [[ name: "Grain position", min: 0.0f, max: 1.0f, init: 0.5f ]];
-    input value float pitch [[ name: "Grain pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
+    input value float density [[ name: "Density", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     
     node engine = GrainDelayEngine;
-    // This is our processor's entry-point function, which is invoked
-    // by the system
     connection
     {
         audio_in -> engine.audio_in;
@@ -22,9 +19,6 @@ graph graindelay  [[ main ]]
         engine.audio_out_left -> audio_out_left;
         engine.audio_out_right -> audio_out_right;
     }
-
-    let volume = 0.15f;
-    
 }
 
 processor GrainDelayEngine
@@ -72,7 +66,8 @@ processor GrainDelayEngine
                         playheads[i].outPlaypos = 0;
                         let sz = 0.01+grainsize*0.9;
                         playheads[i].lenSamples = int(processor.frequency * sz);
-                        let delaytime = int(4096 + grainposition * 44100);
+                        let randomPos = grainposition + rng.getUnipolar() * 0.1;
+                        let delaytime = int(4096 + randomPos * 44100);
                         playheads[i].sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
                         let rate = pow(2.0f,grainpitch/12.0f);
                         playheads[i].playRate = rate;
@@ -104,11 +99,11 @@ processor GrainDelayEngine
                     let frac = playheads[i].sourceReadPos - int(playheads[i].sourceReadPos);
                     let y0left = delayBuffer[sourceReadIndex0][0];
                     let y1left = delayBuffer[sourceReadIndex1][0];
-                    let interpLeft = y0left+y1left*frac;
+                    let interpLeft = y0left+(y1left-y0left)*frac;
                     outLeft += float(gain) * float(interpLeft);
                     let y0right = delayBuffer[sourceReadIndex0][1];
                     let y1right = delayBuffer[sourceReadIndex1][1];
-                    let interpRight = y0right+y1right*frac;
+                    let interpRight = y0right+(y1right-y0right)*frac;
                     outRight += float(gain) * float(interpRight);
                     playheads[i].sourceReadPos+=playheads[i].playRate;
                     playheads[i].outPlaypos++;
