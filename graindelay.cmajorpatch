@@ -1,0 +1,15 @@
+
+{
+    "CmajorVersion":    1,
+    "ID":               "com.your_name.your_patch_ID",
+    "version":          "1.0",
+    "name":             "graindelay",
+    "description":      "graindelay", 
+    "category":         "generator",
+    "manufacturer":     "Your Company Goes Here",
+    "isInstrument":     false,
+    
+
+    "source":           "graindelay.cmajor"
+}
+  
