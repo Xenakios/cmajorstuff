@@ -3,6 +3,7 @@ graph graindelay  [[ main ]]
     input stream float<2> audio_in;
     output stream float audio_out_left;
     output stream float audio_out_right;
+    input value float freezeInput [[ name: "Freeze input", text: "off|on", boolean ]];
     input value float density [[ name: "Density", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
@@ -16,6 +17,7 @@ graph graindelay  [[ main ]]
         position -> engine.grainposition;
         size -> engine.grainsize;
         pitch -> engine.grainpitch;
+        freezeInput -> engine.inputFrozen;
         engine.audio_out_left -> audio_out_left;
         engine.audio_out_right -> audio_out_right;
     }
@@ -28,6 +30,7 @@ processor GrainDelayEngine
     input stream float grainrate;
     input stream float grainsize;
     input stream float grainpitch;
+    input stream float inputFrozen;
     output stream float audio_out_left;
     output stream float audio_out_right;
     let maxDelayLength = 10 * 44100;
@@ -53,9 +56,13 @@ processor GrainDelayEngine
         float64 grainPhasor = 0.0f;
         loop
         {
-            delayBuffer[writeIndex][0] = audio_in[0];
-            delayBuffer[writeIndex][1] = audio_in[1];
-            writeIndex++;
+            if (inputFrozen<0.5f)
+            {
+                delayBuffer[writeIndex][0] = audio_in[0];
+                delayBuffer[writeIndex][1] = audio_in[1];
+                writeIndex++;
+            }
+                
             if (grainPhasor == 0.0)
             {
                 for (wrap<numPlayheads> i)
@@ -66,7 +73,7 @@ processor GrainDelayEngine
                         playheads[i].outPlaypos = 0;
                         let sz = 0.01+grainsize*0.9;
                         playheads[i].lenSamples = int(processor.frequency * sz);
-                        let randomPos = grainposition + rng.getUnipolar() * 0.1;
+                        let randomPos = grainposition + rng.getUnipolar() * 0.01;
                         let delaytime = int(4096 + randomPos * 44100);
                         playheads[i].sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
                         let rate = pow(2.0f,grainpitch/12.0f);
@@ -76,7 +83,7 @@ processor GrainDelayEngine
                     }
                 }   
             }
-            let rate = pow(2.0, grainrate*4.0);
+            let rate = pow(2.0, grainrate*6.0);
             grainPhasor += 1.0 / processor.frequency * rate;
             if (grainPhasor >= 1.0)
             {
