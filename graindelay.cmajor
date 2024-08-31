@@ -35,7 +35,7 @@ processor GrainDelayEngine
     input stream float grainChance;
     input stream float feedBack;
     output stream float<2> audio_out;
-    output stream float audio_out_right;
+    
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
