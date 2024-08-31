@@ -1,15 +1,15 @@
 graph graindelay  [[ main ]]
 {
     input stream float<2> audio_in;
-    output stream float audio_out_left;
-    output stream float audio_out_right;
+    output stream float<2> audio_out;
+    
     input value float freezeInput [[ name: "Freeze input", text: "off|on", boolean ]];
     input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float feedback [[ name: "Feedback", min: -0.99f, max: 0.99f, init: 0.0f ]];
+    
     node engine = GrainDelayEngine;
     connection
     {
@@ -20,9 +20,7 @@ graph graindelay  [[ main ]]
         pitch -> engine.grainpitch;
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
-        feedback -> engine.feedBack;
-        engine.audio_out_left -> audio_out_left;
-        engine.audio_out_right -> audio_out_right;
+        engine.audio_out -> audio_out;
     }
 }
 
@@ -36,13 +34,11 @@ processor GrainDelayEngine
     input stream float inputFrozen;
     input stream float grainChance;
     input stream float feedBack;
-    output stream float audio_out_left;
+    output stream float<2> audio_out;
     output stream float audio_out_right;
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
-    float feedBackLeft;
-    float feedBackRight;
     struct PlayHead
     {
         bool isActive;
@@ -66,8 +62,7 @@ processor GrainDelayEngine
         {
             if (inputFrozen<0.5f)
             {
-                delayBuffer[writeIndex][0] = audio_in[0] + feedBackLeft;
-                delayBuffer[writeIndex][1] = audio_in[1] + feedBackRight;
+                delayBuffer[writeIndex] = (audio_in[0],audio_in[1]);
                 writeIndex++;
             }
             
@@ -147,10 +142,7 @@ processor GrainDelayEngine
                 
                 
             }
-            audio_out_left <- tanh(outLeft * 0.5f);
-            audio_out_right <- tanh(outRight * 0.5f);
-            // feedBackLeft = outLeft * 0.5f * feedBack;
-            // feedBackRight = outRight * 0.5f * feedBack;
+            audio_out <- (tanh(outLeft * 0.5f),tanh(outRight * 0.5f));
             advance();
         }
         
