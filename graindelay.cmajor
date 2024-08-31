@@ -83,6 +83,7 @@ processor GrainDelayEngine
                     // Might be nice to have some of these random distributions in the 
                     // Cmajor standard lib, like exponential, Gauss, Cauchy...
                     float64 seconds = -log(rng.getUnipolar())*secondsavg; // exponential distribution
+                    seconds = clamp(seconds,0.001,1.0);
                     rate = 1.0/seconds;
                 } else if (grainrate<0.0)
                 {
