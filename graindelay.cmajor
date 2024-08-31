@@ -1,3 +1,11 @@
+/*
+A rather primitive granular delay. 
+Best Cmajor practices are not probably followed, the code is pretty
+much a port of some C++ code I did recently.
+
+-Xenakios
+*/
+
 graph graindelay  [[ main ]]
 {
     input stream float<2> audio_in;
@@ -72,7 +80,9 @@ processor GrainDelayEngine
                 if (grainrate>0.0)
                 {
                     float64 secondsavg = 1.0/pow(2.0, grainrate*6.0);
-                    float64 seconds = -log(rng.getUnipolar())*secondsavg;
+                    // Might be nice to have some of these random distributions in the 
+                    // Cmajor standard lib, like exponential, Gauss, Cauchy...
+                    float64 seconds = -log(rng.getUnipolar())*secondsavg; // exponential distribution
                     rate = 1.0/seconds;
                 } else if (grainrate<0.0)
                 {
@@ -145,7 +155,8 @@ processor GrainDelayEngine
                 
                 
             }
-            audio_out <- (tanh(outLeft * 0.5f * mainvol),tanh(outRight * 0.5f * mainvol));
+            // the tanh shaping is pretty rough, should make optional/adjustable
+            audio_out <- (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f));
             advance();
         }
         
