@@ -100,7 +100,9 @@ processor GrainDelayEngine
                         {
                             playheads[i].isActive = true;
                             playheads[i].outPlaypos = 0;
-                            let sz = 0.01+grainsize*0.9;
+                            // use most of the knob range in the shorter sizes
+                            float sz = pow(grainsize, 3.0f);
+                            sz = 0.01f + 0.99f * sz;
                             playheads[i].lenSamples = int(processor.frequency * sz);
                             let randomPos = grainposition + rng.getUnipolar() * 0.00;
                             let mindelay = 4096;
@@ -138,17 +140,15 @@ processor GrainDelayEngine
                     let sourceReadIndex0 = wrap<maxDelayLength>(floor(playheads[i].sourceReadPos));
                     let sourceReadIndex1 = wrap<maxDelayLength>(sourceReadIndex0 + 1);
                     let frac = playheads[i].sourceReadPos - int(playheads[i].sourceReadPos);
-                    let y0left = delayBuffer[sourceReadIndex0][0];
-                    let y1left = delayBuffer[sourceReadIndex1][0];
-                    let interpLeft = y0left+(y1left-y0left)*frac;
-                    outLeft += float(gain) * float(interpLeft);
-                    let y0right = delayBuffer[sourceReadIndex0][1];
-                    let y1right = delayBuffer[sourceReadIndex1][1];
-                    let interpRight = y0right+(y1right-y0right)*frac;
-                    outRight += float(gain) * float(interpRight);
-                    playheads[i].sourceReadPos+=playheads[i].playRate;
+                    let vy0 = delayBuffer[sourceReadIndex0];
+                    let vy1 = delayBuffer[sourceReadIndex1];
+                    let vinterp = vy0 + (vy1 - vy0) * frac;
+                    outLeft += float(gain) * float(vinterp[0]);
+                    outRight += float(gain) * float(vinterp[1]);
+                    
+                    playheads[i].sourceReadPos += playheads[i].playRate;
                     playheads[i].outPlaypos++;
-                    if (playheads[i].outPlaypos==playheads[i].lenSamples)
+                    if (playheads[i].outPlaypos == playheads[i].lenSamples)
                     {
                         playheads[i].isActive = false;
                     }
