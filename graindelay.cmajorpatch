@@ -8,8 +8,5 @@
     "category":         "generator",
     "manufacturer":     "Your Company Goes Here",
     "isInstrument":     false,
-    
-
     "source":           "graindelay.cmajor"
 }
-  
