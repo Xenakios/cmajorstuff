@@ -9,7 +9,7 @@ graph graindelay  [[ main ]]
     input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    
+    input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.1f ]];
     node engine = GrainDelayEngine;
     connection
     {
@@ -20,6 +20,7 @@ graph graindelay  [[ main ]]
         pitch -> engine.grainpitch;
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
+        mainvol -> engine.mainvol;
         engine.audio_out -> audio_out;
     }
 }
@@ -33,7 +34,7 @@ processor GrainDelayEngine
     input stream float grainpitch;
     input stream float inputFrozen;
     input stream float grainChance;
-    input stream float feedBack;
+    input stream float mainvol;
     output stream float<2> audio_out;
     
     let maxDelayLength = 10 * 44100;
@@ -68,15 +69,19 @@ processor GrainDelayEngine
             
             if (grainPhasor == 0.0)
             {
-                rate = pow(2.0, abs(grainrate)*6.0);
                 if (grainrate>0.0)
                 {
-                    rate = -log(rng.getUnipolar())*rate;
+                    float64 secondsavg = 1.0/pow(2.0, grainrate*6.0);
+                    float64 seconds = -log(rng.getUnipolar())*secondsavg;
+                    rate = 1.0/seconds;
+                } else if (grainrate<0.0)
+                {
+                    rate = pow(2.0, abs(grainrate)*6.0);
                 } else
                 {
-                    
+                    rate = 0.0;
                 }
-                if (rng.getUnipolar()<grainChance)
+                if (abs(rate)>0.0 && rng.getUnipolar()<grainChance)
                 {
                     for (wrap<numPlayheads> i)
                     {
@@ -100,20 +105,18 @@ processor GrainDelayEngine
                 }
                    
             }
-            if (rate>0.0)
+            grainPhasor += 1.0 / processor.frequency * rate;
+            if (grainPhasor >= 1.0)
             {
-                grainPhasor += 1.0 / processor.frequency * rate;
-                if (grainPhasor >= 1.0)
-                {
-                    grainPhasor = 0.0;
-                }
+                // this isn't the best way to do this but it's easier to detect the phasor resetted
+                // this way
+                grainPhasor = 0.0;
             }
-            
             float outLeft = 0.0f;
             float outRight = 0.0f;
             for (wrap<numPlayheads> i)
             {
-                if (playheads[i].isActive)
+                if (rate>0.0 && playheads[i].isActive)
                 {
                     float64 gain = 1.0;
                     let halflen = playheads[i].lenSamples / 2;
@@ -142,7 +145,7 @@ processor GrainDelayEngine
                 
                 
             }
-            audio_out <- (tanh(outLeft * 0.5f),tanh(outRight * 0.5f));
+            audio_out <- (tanh(outLeft * 0.5f * mainvol),tanh(outRight * 0.5f * mainvol));
             advance();
         }
         
