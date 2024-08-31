@@ -9,6 +9,7 @@ graph graindelay  [[ main ]]
     input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
+    input value float feedback [[ name: "Feedback", min: -0.99f, max: 0.99f, init: 0.0f ]];
     node engine = GrainDelayEngine;
     connection
     {
@@ -19,6 +20,7 @@ graph graindelay  [[ main ]]
         pitch -> engine.grainpitch;
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
+        feedback -> engine.feedBack;
         engine.audio_out_left -> audio_out_left;
         engine.audio_out_right -> audio_out_right;
     }
@@ -33,11 +35,14 @@ processor GrainDelayEngine
     input stream float grainpitch;
     input stream float inputFrozen;
     input stream float grainChance;
+    input stream float feedBack;
     output stream float audio_out_left;
     output stream float audio_out_right;
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
+    float feedBackLeft;
+    float feedBackRight;
     struct PlayHead
     {
         bool isActive;
@@ -60,8 +65,8 @@ processor GrainDelayEngine
         {
             if (inputFrozen<0.5f)
             {
-                delayBuffer[writeIndex][0] = audio_in[0];
-                delayBuffer[writeIndex][1] = audio_in[1];
+                delayBuffer[writeIndex][0] = audio_in[0] + feedBackLeft;
+                delayBuffer[writeIndex][1] = audio_in[1] + feedBackRight;
                 writeIndex++;
             }
             
@@ -78,7 +83,9 @@ processor GrainDelayEngine
                             let sz = 0.01+grainsize*0.9;
                             playheads[i].lenSamples = int(processor.frequency * sz);
                             let randomPos = grainposition + rng.getUnipolar() * 0.01;
-                            let delaytime = int(4096 + randomPos * 44100);
+                            let mindelay = 4096;
+                            let maxdelay = int(processor.frequency * 4.0);
+                            let delaytime = int(mindelay + randomPos * maxdelay);
                             playheads[i].sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
                             let rate = pow(2.0f,grainpitch/12.0f);
                             playheads[i].playRate = rate;
@@ -128,9 +135,10 @@ processor GrainDelayEngine
                 
                 
             }
-            audio_out_left <- outLeft * 0.5f;
-            audio_out_right <- outRight * 0.5f;
-            
+            audio_out_left <- tanh(outLeft * 0.5f);
+            audio_out_right <- tanh(outRight * 0.5f);
+            // feedBackLeft = outLeft * 0.5f * feedBack;
+            // feedBackRight = outRight * 0.5f * feedBack;
             advance();
         }
         
