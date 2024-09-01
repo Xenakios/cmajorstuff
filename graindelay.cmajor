@@ -70,7 +70,33 @@ processor GrainDelayEngine
     let numPlayheads = 32;
     PlayHead[numPlayheads] playheads;
     std::random::RNG rng;
-    
+    void initPlayhead(PlayHead& ph, int64 graincounter, int64 outputpos)
+    {
+       /*
+        ph.isActive = true;
+        ph.outPlaypos = 0;
+        // use most of the knob range in the shorter sizes
+        float sz = pow(grainsize, 3.0f);
+        sz = 0.01f + 0.99f * sz;
+        ph.lenSamples = int(processor.frequency * sz);
+        let randomPos = grainposition + rng.getUnipolar() * 0.00;
+        let mindelay = int(processor.frequency * 0.05);
+        let maxdelay = int(processor.frequency * 4.0);
+        let delaytime = int(mindelay + randomPos * maxdelay);
+        ph.sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
+        let rate = pow(2.0f,grainpitch/12.0f);
+        ph.playRate = rate;
+        int fadelen = int(ph.lenSamples / 2 * grainshape);
+        fadelen = clamp(fadelen,32,ph.lenSamples/2);
+        ph.fadelensamples = fadelen;
+        float panpos = 0.0f;
+        if (int(panmode) == 1)
+            panpos = -1.0f + 2.0f * (graincounter % 2);
+        if (int(panmode) == 2)
+            panpos = float(0.95 * sin(2*pi/processor.frequency*outputpos*0.25));
+        ph.pangains = std::pan_law::centre3dB(panpos);
+        */
+    }
     void main()
     {
         writeIndex = maxDelayLength - 1;
