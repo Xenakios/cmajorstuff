@@ -121,6 +121,7 @@ processor GrainDelayEngine
                             int fadelen = int(playheads[i].lenSamples / 2 * grainshape);
                             fadelen = clamp(fadelen,32,playheads[i].lenSamples/2);
                             playheads[i].fadelensamples = fadelen;
+                            // float panrate = 4.0f+3.9f*float(sin(2*pi/processor.frequency*outputpos*0.2));
                             float panpos = float(0.95*sin(2*pi/processor.frequency*outputpos*0.25));
                             playheads[i].pangains = std::pan_law::centre3dB(panpos);
                             graincounter++;
