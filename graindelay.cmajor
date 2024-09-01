@@ -59,6 +59,7 @@ processor GrainDelayEngine
         int outPlaypos;
         float playRate;
         int fadelensamples;
+        float panpos;
     }
     let numPlayheads = 32;
     PlayHead[numPlayheads] playheads;
@@ -71,6 +72,7 @@ processor GrainDelayEngine
     {
         float64 grainPhasor = 0.0f;
         float64 rate = 0.0;
+        int64 graincounter = 0;
         loop
         {
             if (inputFrozen<0.5f)
@@ -118,6 +120,8 @@ processor GrainDelayEngine
                             int fadelen = int(playheads[i].lenSamples / 2 * grainshape);
                             fadelen = clamp(fadelen,32,playheads[i].lenSamples/2);
                             playheads[i].fadelensamples = fadelen;
+                            playheads[i].panpos = 1.0f/5*(graincounter % 6);
+                            graincounter++;
                             // console <- "started grain " <- i <- "\n";
                             break;
                         }
@@ -152,8 +156,9 @@ processor GrainDelayEngine
                     let vy0 = delayBuffer[sourceReadIndex0];
                     let vy1 = delayBuffer[sourceReadIndex1];
                     let vinterp = vy0 + (vy1 - vy0) * frac;
-                    outLeft += float(gain) * float(vinterp[0]);
-                    outRight += float(gain) * float(vinterp[1]);
+                    float pan = playheads[i].panpos;
+                    outLeft += float(gain) * float(vinterp[0]) * pan;
+                    outRight += float(gain) * float(vinterp[1]) * (1.0f-pan);
                     
                     playheads[i].sourceReadPos += playheads[i].playRate;
                     playheads[i].outPlaypos++;
