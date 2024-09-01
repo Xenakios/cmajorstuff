@@ -1,6 +1,6 @@
 /*
-A rather primitive granular delay. 
-Best Cmajor practices are not probably followed, the code is pretty
+A rather simple granular delay. 
+Best Cmajor practices are not mostly followed yet, the code is pretty
 much a port of some C++ code I did recently.
 
 -Xenakios
@@ -75,6 +75,7 @@ processor GrainDelayEngine
         float64 rate = 0.0;
         int64 graincounter = 0;
         int64 outputpos = 0;
+        int numActivePlayheads = 0;
         loop
         {
             float<2> dry_in = audio_in;
@@ -128,6 +129,7 @@ processor GrainDelayEngine
                             playheads[i].pangains = std::pan_law::centre3dB(panpos);
                             graincounter++;
                             // console <- "started grain " <- i <- "\n";
+                            numActivePlayheads++;
                             break;
                         }
                     }
@@ -171,13 +173,18 @@ processor GrainDelayEngine
                     if (playheads[i].outPlaypos == playheads[i].lenSamples)
                     {
                         playheads[i].isActive = false;
+                        numActivePlayheads--;
                     }
                 }
                 
                 
             }
+            let tempnumplayheads = clamp(numActivePlayheads,0,numPlayheads);
+            // not really based on anything, just attenuate the mix level some when more
+            // playheads are playing simultaneously
+            float gainCompens = 1.0f - tempnumplayheads * 0.025f;
             // the tanh shaping is pretty rough, should make optional/adjustable
-            float<2> wet = (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f));
+            float<2> wet = (mainvol * tanh(outLeft * gainCompens),mainvol * tanh(outRight * gainCompens));
             // (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f))
             audio_out <- drywet * wet + (1.0f-drywet) * dry_in;
             advance();
