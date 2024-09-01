@@ -12,13 +12,14 @@ graph graindelay  [[ main ]]
     output stream float<2> audio_out;
     
     input value float freezeInput [[ name: "Freeze input", text: "off|on", boolean ]];
-    input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: 0.0f ]];
+    input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: -0.3f ]];
     input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float shape [[ name: "Shape", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.1f ]];
+    input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
     node engine = GrainDelayEngine;
     connection
     {
@@ -31,6 +32,7 @@ graph graindelay  [[ main ]]
         chance -> engine.grainChance;
         mainvol -> engine.mainvol;
         shape -> engine.grainshape;
+        drywet -> engine.drywet;
         engine.audio_out -> audio_out;
     }
 }
@@ -46,6 +48,7 @@ processor GrainDelayEngine
     input stream float inputFrozen;
     input stream float grainChance;
     input stream float mainvol;
+    input stream float drywet;
     output stream float<2> audio_out;
     
     let maxDelayLength = 10 * 44100;
@@ -64,18 +67,17 @@ processor GrainDelayEngine
     let numPlayheads = 32;
     PlayHead[numPlayheads] playheads;
     std::random::RNG rng;
-    void init()
-    {
-        writeIndex = maxDelayLength - 1;
-    }
+    
     void main()
     {
+        writeIndex = maxDelayLength - 1;
         float64 grainPhasor = 0.0f;
         float64 rate = 0.0;
         int64 graincounter = 0;
         int64 outputpos = 0;
         loop
         {
+            float<2> dry_in = audio_in;
             if (inputFrozen<0.5f)
             {
                 delayBuffer[writeIndex] = (audio_in[0],audio_in[1]);
@@ -99,7 +101,7 @@ processor GrainDelayEngine
                 {
                     rate = 0.0;
                 }
-                if (abs(rate)>0.0 && rng.getUnipolar()<grainChance)
+                if (rate>0.0 && rng.getUnipolar()<grainChance)
                 {
                     for (wrap<numPlayheads> i)
                     {
@@ -112,7 +114,7 @@ processor GrainDelayEngine
                             sz = 0.01f + 0.99f * sz;
                             playheads[i].lenSamples = int(processor.frequency * sz);
                             let randomPos = grainposition + rng.getUnipolar() * 0.00;
-                            let mindelay = 4096;
+                            let mindelay = int(processor.frequency * 0.05);
                             let maxdelay = int(processor.frequency * 4.0);
                             let delaytime = int(mindelay + randomPos * maxdelay);
                             playheads[i].sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
@@ -175,7 +177,9 @@ processor GrainDelayEngine
                 
             }
             // the tanh shaping is pretty rough, should make optional/adjustable
-            audio_out <- (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f));
+            float<2> wet = (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f));
+            // (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f))
+            audio_out <- drywet * wet + (1.0f-drywet) * dry_in;
             advance();
         }
         
