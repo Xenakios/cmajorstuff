@@ -28,6 +28,7 @@ graph graindelay  [[ main ]]
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input value float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy",init:1.0f ]];
+    input value float panparam0 [[ name: "Pan param", min: 0.01f, max: 16.0f, init: 1.0f ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
     node engine = GrainDelayEngine;
@@ -45,6 +46,7 @@ graph graindelay  [[ main ]]
         drywet -> engine.drywet;
         panmode -> engine.panmode;
         positionrand -> engine.positionrand;
+        panparam0 -> engine.panparam0;
         pitchrand -> engine.pitchrand;
         engine.audio_out -> audio_out;
     }
@@ -65,11 +67,13 @@ processor GrainDelayEngine
     input stream float panmode;
     input stream float positionrand;
     input stream float pitchrand;
+    input stream float panparam0;
     output stream float<2> audio_out;
     
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
+    
     struct PlayHead
     {
         bool isActive;
@@ -100,7 +104,7 @@ processor GrainDelayEngine
         }
         return 0.0f;
     }
-    void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos)
+    void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos, float grainDensity)
     {
        
         ph.isActive = true;
@@ -118,8 +122,8 @@ processor GrainDelayEngine
         float pitch = grainpitch + getBipolarRandom(pitchrand,rng)*12.0f;
         // allow the modulations to go a bit past the normal range of the pitch :-)
         pitch = clamp(pitch, -18.0f, 18.0f);
-        let rate = pow(2.0f, pitch / 12.0f);
-        ph.playRate = rate;
+        let playrate = pow(2.0f, pitch / 12.0f);
+        ph.playRate = playrate;
         int fadelen = int(ph.lenSamples / 2 * grainshape);
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
         ph.fadelensamples = fadelen;
@@ -128,8 +132,10 @@ processor GrainDelayEngine
             panpos = -1.0f + 2.0f * (graincounter % 2);
         if (int(panmode) == 2)
         {
-            float offset = float(twoPi)/5*(graincounter % 4);
-            panpos = float(0.95 * sin(2*pi/processor.frequency*playbackPos*0.1+offset));
+            if (graincounter % 2 == 0)
+                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.0));            
+            if (graincounter % 2 == 1)
+                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.13));
         }
         if (int(panmode) == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
@@ -159,11 +165,13 @@ processor GrainDelayEngine
             {
                 if (grainrate>0.0)
                 {
+                    // calculate the next random grain time as seconds for clarity
                     float64 secondsavg = 1.0/pow(2.0, grainrate*6.0);
                     // Might be nice to have some of these random distributions in the 
                     // Cmajor standard lib, like exponential, Gauss, Cauchy...
                     float64 seconds = -log(rng.getUnipolar())*secondsavg; // exponential distribution
                     seconds = clamp(seconds,0.001,1.0);
+                    // then go back to Hz rate
                     rate = 1.0/seconds;
                 } else if (grainrate<0.0)
                 {
@@ -178,7 +186,7 @@ processor GrainDelayEngine
                     {
                         if (!playheads[i].isActive)
                         {
-                            initPlayhead(playheads[i],graincounter,playbackPos);
+                            initPlayhead(playheads[i],graincounter,playbackPos,float(rate));
                             graincounter++;
                             numActivePlayheads++;
                             break;
