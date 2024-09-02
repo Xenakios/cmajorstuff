@@ -7,6 +7,8 @@ much as a port of some C++ code I did recently.
 Issues :
 - Resampling could be done with a better algorithm instead of the linear interpolation
 - The grain envelope shapes could be more imaginative
+- The size parameter should go from negative to positive, negative values causing reverse playback
+- No custom GUI
 
 -Xenakios, September 2024
 */
@@ -17,16 +19,16 @@ graph graindelay  [[ main ]]
     output stream float<2> audio_out;
     
     input value float freezeInput [[ name: "Freeze input", text: "off|on", boolean ]];
-    input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: -0.3f ]];
-    input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: -0.5f ]];
+    input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.6f ]];
     input value float shape [[ name: "Shape", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float position [[ name: "Time", min: 0.0f, max: 1.0f, init: 0.5f ]];
-    input value float positionrand [[ name: "Time rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
+    input value float position [[ name: "Time", min: 0.0f, max: 1.0f, init: 0.1f ]];
+    input value float positionrand [[ name: "Time rnd", min: -1.0f, max: 1.0f, init: 0.1f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy" ]];
-    input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.1f ]];
+    input value float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy",init:1.0f ]];
+    input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
     node engine = GrainDelayEngine;
     connection
@@ -98,14 +100,13 @@ processor GrainDelayEngine
         }
         return 0.0f;
     }
-    void initPlayhead(PlayHead& ph, int64 graincounter, int64 outputpos, 
-                    float grainsize, float grainposition, float grainpitch)
+    void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos)
     {
        
         ph.isActive = true;
         ph.outPlaypos = 0;
         // use most of the knob range in the shorter sizes
-        float sz = pow(grainsize, 3.0f);
+        float sz = pow(grainsize, 2.0f);
         sz = 0.01f + 0.99f * sz;
         ph.lenSamples = int(processor.frequency * sz);
         float randomPos = grainposition + getBipolarRandom(positionrand,rng)*0.5f;
@@ -127,8 +128,8 @@ processor GrainDelayEngine
             panpos = -1.0f + 2.0f * (graincounter % 2);
         if (int(panmode) == 2)
         {
-            float offset = float(twoPi)/32*(graincounter % 128);
-            panpos = float(0.95 * sin(2*pi/processor.frequency*outputpos*0.25+offset));
+            float offset = float(twoPi)/5*(graincounter % 4);
+            panpos = float(0.95 * sin(2*pi/processor.frequency*playbackPos*0.1+offset));
         }
         if (int(panmode) == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
@@ -143,7 +144,7 @@ processor GrainDelayEngine
         float64 grainPhasor = 0.0f;
         float64 rate = 0.0;
         int64 graincounter = 0;
-        int64 outputpos = 0;
+        int64 playbackPos = 0;
         int numActivePlayheads = 0;
         loop
         {
@@ -177,8 +178,7 @@ processor GrainDelayEngine
                     {
                         if (!playheads[i].isActive)
                         {
-                            initPlayhead(playheads[i],graincounter,outputpos, 
-                                grainsize, grainposition, grainpitch);
+                            initPlayhead(playheads[i],graincounter,playbackPos);
                             graincounter++;
                             numActivePlayheads++;
                             break;
@@ -194,7 +194,7 @@ processor GrainDelayEngine
                 // this way
                 grainPhasor = 0.0;
             }
-            outputpos++;
+            playbackPos++;
             float outLeft = 0.0f;
             float outRight = 0.0f;
             for (wrap<numPlayheads> i)
