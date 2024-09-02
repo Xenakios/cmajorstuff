@@ -1,0 +1,14 @@
+
+{
+    "CmajorVersion":    1,
+    "ID":               "com.xenakios.katastrofi",
+    "version":          "1.0",
+    "name":             "Katastrofi",
+    "description":      "lofi", 
+    "category":         "effect",
+    "manufacturer":     "Xenakios",
+    "isInstrument":     false,
+    "source":           "katastrofi.cmajor"
+}
+
+
