@@ -1,0 +1,13 @@
+
+{
+    "CmajorVersion":    1,
+    "ID":               "com.xenakios.omichles",
+    "version":          "1.0",
+    "name":             "Omichles",
+    "description":      "granular delay", 
+    "category":         "effect",
+    "manufacturer":     "Xenakios",
+    "isInstrument":     false,
+    "source":           "omichles.cmajor"
+}
+
