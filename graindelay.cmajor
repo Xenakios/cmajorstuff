@@ -1,9 +1,14 @@
 /*
-A rather simple granular delay. 
-Best Cmajor practices are not mostly followed yet, the code is pretty
-much a port of some C++ code I did recently.
+A granular delay. 
 
--Xenakios
+Best Cmajor practices are not mostly followed yet, the code started pretty
+much as a port of some C++ code I did recently.
+
+Issues :
+- Resampling could be done with a better algorithm instead of the linear interpolation
+- The grain envelope shapes could be more imaginative
+
+-Xenakios, September 2024
 */
 
 graph graindelay  [[ main ]]
@@ -94,8 +99,7 @@ processor GrainDelayEngine
         return 0.0f;
     }
     void initPlayhead(PlayHead& ph, int64 graincounter, int64 outputpos, 
-                    float grainsize, float grainposition, float grainpitch, float grainshape, 
-                    float panmode, float positionrand)
+                    float grainsize, float grainposition, float grainpitch)
     {
        
         ph.isActive = true;
@@ -108,11 +112,12 @@ processor GrainDelayEngine
         randomPos = clamp(randomPos,0.0f,1.0f);
         let mindelay = int(processor.frequency * 0.05);
         let maxdelay = int(processor.frequency * 4.0);
-        let delaytime = int(mindelay + randomPos * (maxdelay-mindelay));
+        let delaytime = int(mindelay + randomPos * (maxdelay - mindelay));
         ph.sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
         float pitch = grainpitch + getBipolarRandom(pitchrand,rng)*12.0f;
-        pitch = clamp(pitch,-12.0f,12.0f);
-        let rate = pow(2.0f,pitch/12.0f);
+        // allow the modulations to go a bit past the normal range of the pitch :-)
+        pitch = clamp(pitch, -18.0f, 18.0f);
+        let rate = pow(2.0f, pitch / 12.0f);
         ph.playRate = rate;
         int fadelen = int(ph.lenSamples / 2 * grainshape);
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
@@ -166,8 +171,7 @@ processor GrainDelayEngine
                         if (!playheads[i].isActive)
                         {
                             initPlayhead(playheads[i],graincounter,outputpos, 
-                                grainsize, grainposition, grainpitch, grainshape, 
-                                panmode, positionrand);
+                                grainsize, grainposition, grainpitch);
                             graincounter++;
                             numActivePlayheads++;
                             break;
