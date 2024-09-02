@@ -25,7 +25,7 @@ graph graindelay  [[ main ]]
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float panmode [[ name: "Pan", text: "center|alt L/R|sine" ]];
+    input value float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy" ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.1f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
     node engine = GrainDelayEngine;
@@ -127,6 +127,10 @@ processor GrainDelayEngine
             panpos = -1.0f + 2.0f * (graincounter % 2);
         if (int(panmode) == 2)
             panpos = float(0.95 * sin(2*pi/processor.frequency*outputpos*0.25));
+        if (int(panmode) == 3)
+            panpos = -1.0f+2.0f*rng.getUnipolar();
+        if (int(panmode) == 4)
+            panpos = getBipolarRandom(-0.5f,rng);
         ph.pangains = std::pan_law::centre3dB(panpos);
         
     }
