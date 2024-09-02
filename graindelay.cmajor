@@ -126,7 +126,10 @@ processor GrainDelayEngine
         if (int(panmode) == 1)
             panpos = -1.0f + 2.0f * (graincounter % 2);
         if (int(panmode) == 2)
-            panpos = float(0.95 * sin(2*pi/processor.frequency*outputpos*0.25));
+        {
+            float offset = float(twoPi)/32*(graincounter % 128);
+            panpos = float(0.95 * sin(2*pi/processor.frequency*outputpos*0.25+offset));
+        }
         if (int(panmode) == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
         if (int(panmode) == 4)
