@@ -15,8 +15,10 @@ graph graindelay  [[ main ]]
     input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: -0.3f ]];
     input value float size [[ name: "Size", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float shape [[ name: "Shape", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float position [[ name: "Position", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float position [[ name: "Time", min: 0.0f, max: 1.0f, init: 0.5f ]];
+    input value float positionrand [[ name: "Time rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
+    input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input value float panmode [[ name: "Pan", text: "center|alt L/R|sine" ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.1f ]];
@@ -35,6 +37,8 @@ graph graindelay  [[ main ]]
         shape -> engine.grainshape;
         drywet -> engine.drywet;
         panmode -> engine.panmode;
+        positionrand -> engine.positionrand;
+        pitchrand -> engine.pitchrand;
         engine.audio_out -> audio_out;
     }
 }
@@ -52,6 +56,8 @@ processor GrainDelayEngine
     input stream float mainvol;
     input stream float drywet;
     input stream float panmode;
+    input stream float positionrand;
+    input stream float pitchrand;
     output stream float<2> audio_out;
     
     let maxDelayLength = 10 * 44100;
@@ -70,8 +76,26 @@ processor GrainDelayEngine
     let numPlayheads = 32;
     PlayHead[numPlayheads] playheads;
     std::random::RNG rng;
+    float getBipolarRandom(float param, std::random::RNG& rng)
+    {
+        float z = rng.getUnipolar();
+        if (param<0.0f)
+        {
+            float temp=abs(param);
+            temp = pow(temp,2.0f);
+            float cauchy = 0.1f * temp * tan(float(pi)*(z-0.5f));
+            return clamp(cauchy,-1.0f,1.0f);
+        } else
+        {
+            float temp=pow(param,2.0f);
+            float halfrange = temp / 2;
+            return -halfrange+temp*z;
+        }
+        return 0.0f;
+    }
     void initPlayhead(PlayHead& ph, int64 graincounter, int64 outputpos, 
-                    float grainsize, float grainposition, float grainpitch, float grainshape, float panmode)
+                    float grainsize, float grainposition, float grainpitch, float grainshape, 
+                    float panmode, float positionrand)
     {
        
         ph.isActive = true;
@@ -80,12 +104,15 @@ processor GrainDelayEngine
         float sz = pow(grainsize, 3.0f);
         sz = 0.01f + 0.99f * sz;
         ph.lenSamples = int(processor.frequency * sz);
-        let randomPos = grainposition + rng.getUnipolar() * 0.00;
+        float randomPos = grainposition + getBipolarRandom(positionrand,rng)*0.5f;
+        randomPos = clamp(randomPos,0.0f,1.0f);
         let mindelay = int(processor.frequency * 0.05);
         let maxdelay = int(processor.frequency * 4.0);
-        let delaytime = int(mindelay + randomPos * maxdelay);
+        let delaytime = int(mindelay + randomPos * (maxdelay-mindelay));
         ph.sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime));
-        let rate = pow(2.0f,grainpitch/12.0f);
+        float pitch = grainpitch + getBipolarRandom(pitchrand,rng)*12.0f;
+        pitch = clamp(pitch,-12.0f,12.0f);
+        let rate = pow(2.0f,pitch/12.0f);
         ph.playRate = rate;
         int fadelen = int(ph.lenSamples / 2 * grainshape);
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
@@ -139,7 +166,8 @@ processor GrainDelayEngine
                         if (!playheads[i].isActive)
                         {
                             initPlayhead(playheads[i],graincounter,outputpos, 
-                                grainsize, grainposition, grainpitch, grainshape, panmode);
+                                grainsize, grainposition, grainpitch, grainshape, 
+                                panmode, positionrand);
                             graincounter++;
                             numActivePlayheads++;
                             break;
