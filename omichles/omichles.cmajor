@@ -58,7 +58,7 @@ graph graindelay  [[ main ]]
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input value float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy",init:1.0f ]];
+    input event float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy",init:1.0f ]];
     input value float panparam0 [[ name: "Pan param", min: 0.01f, max: 16.0f, init: 1.0f ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
@@ -73,6 +73,7 @@ graph graindelay  [[ main ]]
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
         mainvol -> engine.mainvol;
+        
         shape -> engine.grainshape;
         drywet -> engine.drywet;
         panmode -> engine.panmode;
@@ -95,7 +96,7 @@ processor GrainDelayEngine
     input stream float grainChance;
     input stream float mainvol;
     input stream float drywet;
-    input stream float panmode;
+    input event float panmode;
     input stream float positionrand;
     input stream float pitchrand;
     input stream float panparam0;
@@ -104,7 +105,11 @@ processor GrainDelayEngine
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
-    
+    int panmodeValue;
+    event panmode (float m)
+    {
+        panmodeValue = int(m);
+    }
     struct PlayHead
     {
         bool isActive;
@@ -147,18 +152,18 @@ processor GrainDelayEngine
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
         ph.fadelensamples = fadelen;
         float panpos = 0.0f;
-        if (int(panmode) == 1)
+        if (panmodeValue == 1)
             panpos = -1.0f + 2.0f * (graincounter % 2);
-        if (int(panmode) == 2)
+        if (panmodeValue == 2)
         {
             if (graincounter % 2 == 0)
                 panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.0));            
             if (graincounter % 2 == 1)
                 panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.13));
         }
-        if (int(panmode) == 3)
+        if (panmodeValue == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
-        if (int(panmode) == 4)
+        if (panmodeValue == 4)
             panpos = xenakios::getBipolarRandom(-0.5f,rng);
         ph.pangains = std::pan_law::centre3dB(panpos);
         
