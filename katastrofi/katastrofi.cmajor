@@ -8,6 +8,7 @@ graph katastrofi  [[ main ]]
     input value float waveShapingMode [[ name: "Drive mode", text: "Clip|Reflect|Wrap",init:0.0f ]];
     input value float decimation [[ name: "Downsample", min: 0.0f, max: 1.0f, init: 0.0f ]];
     input value float bitDepth [[ name: "Bit reduction", min: 0.0f, max: 1.0f, init: 0.0f ]];
+    input value float xorMangle [[ name: "XOR", min: 16384.0f, max: 20000.0f, init: 16384.0f ]];
     input value float outputLevel [[ name: "Output Volume", min: -36.0f, max: 12.0f, init: -12.0f, rampFrames: 2048 ]];
     
     node engine = LofiEngine;
@@ -20,11 +21,10 @@ graph katastrofi  [[ main ]]
         bitDepth -> engine.bitdepth;
         outputLevel -> engine.outputLevel;
         waveShapingMode -> engine.waveShaping;
+        xorMangle -> engine.xorMangle;
         engine.audio_out -> audio_out;
     }
 }
-
-
 
 processor LofiEngine
 {
@@ -35,6 +35,7 @@ processor LofiEngine
     input stream float outputLevel;
     input stream float bitdepth;
     input stream float waveShaping;
+    input stream float xorMangle;
     float sign(float in)
     {
         if (in<0.0f)
@@ -87,6 +88,12 @@ processor LofiEngine
             float numlevels = pow(2.0f,numBits);
             float<2> crushed = (roundToInt(heldSamples[0]*numlevels)/numlevels,
                                 roundToInt(heldSamples[1]*numlevels)/numlevels);
+            // we are max 16 bits now anyway
+            int<2> intSignal = int<2>(crushed * 32767);
+            int xorValue = int(xorMangle);
+            int<2> xored0 = intSignal ^ xorValue;
+            int<2> xored1 = intSignal ^ (xorValue+1);
+            crushed = xored0 / 32767.0f;
             float outgain = std::levels::dBtoGain(outputLevel);
             crushed[0] = outgain * crushed[0];
             crushed[1] = outgain * crushed[1];
