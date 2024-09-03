@@ -4,7 +4,8 @@ graph katastrofi  [[ main ]]
     input stream float<2> audio_in;
     output stream float<2> audio_out;
     
-    input value float inputDrive [[ name: "Input Drive", min: -36.0f, max: 12.0f, init: 0.0f, rampFrames: 2048 ]];
+    input value float inputDrive [[ name: "Input Drive", min: -36.0f, max: 36.0f, init: 0.0f, rampFrames: 2048 ]];
+    input value float waveShapingMode [[ name: "Drive mode", text: "Clip|Reflect|Wrap",init:0.0f ]];
     input value float decimation [[ name: "Downsample", min: 0.0f, max: 1.0f, init: 0.0f ]];
     input value float bitDepth [[ name: "Bit reduction", min: 0.0f, max: 1.0f, init: 0.0f ]];
     input value float outputLevel [[ name: "Output Volume", min: -36.0f, max: 12.0f, init: -12.0f, rampFrames: 2048 ]];
@@ -18,9 +19,12 @@ graph katastrofi  [[ main ]]
         decimation -> engine.decimation;
         bitDepth -> engine.bitdepth;
         outputLevel -> engine.outputLevel;
+        waveShapingMode -> engine.waveShaping;
         engine.audio_out -> audio_out;
     }
 }
+
+
 
 processor LofiEngine
 {
@@ -30,6 +34,13 @@ processor LofiEngine
     input stream float decimation;
     input stream float outputLevel;
     input stream float bitdepth;
+    input stream float waveShaping;
+    float sign(float in)
+    {
+        if (in<0.0f)
+            return -1.0f;
+        return 1.0f;
+    }
     void main()
     {
         float<2> heldSamples;
@@ -39,6 +50,29 @@ processor LofiEngine
         
         loop
         {
+            float<2> inputsignal = audio_in;
+            inputsignal *= std::levels::dBtoGain(inputDrive);
+            let wsmode = int(waveShaping);
+            if (wsmode == 0)
+            {
+                inputsignal[0] = clamp(inputsignal[0],-1.0f,1.0f);
+                inputsignal[1] = clamp(inputsignal[1],-1.0f,1.0f);
+            }
+                
+            if (wsmode == 1)
+            {
+                float in = inputsignal[0];
+                inputsignal[0] = sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
+                in = inputsignal[1];
+                inputsignal[1] = sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
+            }
+            if (wsmode == 2)
+            {
+                float in = inputsignal[0];
+                inputsignal[0] = 2.0f*(in/2.0f-roundToInt(in/2.0f));
+                in = inputsignal[1];
+                inputsignal[1] = 2.0f*(in/2.0f-roundToInt(in/2.0f));
+            }
             float shapedDecim = pow(decimation, 2.0f);
             shapedDecim = 1.0f + 63.0f * shapedDecim;
             float64 divlen = processor.frequency / (processor.frequency / shapedDecim);
@@ -47,7 +81,7 @@ processor LofiEngine
             if (decimPhase >= divlen)
             {
                 decimPhase -= divlen;
-                heldSamples = audio_in * std::levels::dBtoGain(inputDrive);
+                heldSamples = inputsignal;
             }
             float numBits = 2.0f + pow(1.0f - bitdepth,2.0f) * 14.0f;
             float numlevels = pow(2.0f,numBits);
