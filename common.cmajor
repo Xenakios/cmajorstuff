@@ -1,5 +1,11 @@
 namespace xenakios
 {
+    Type sign<Type>(Type in)
+    {
+        if (in<0)
+            return -1.0;
+        return 1.0;
+    }
     Type remap<Type> (Type sourceValue, Type sourceValueStart, Type sourceValueEnd, 
                         Type destinationStart, Type destinationEnd)   
     { 

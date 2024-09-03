@@ -8,7 +8,7 @@
     "category":         "effect",
     "manufacturer":     "Xenakios",
     "isInstrument":     false,
-    "source":           "katastrofi.cmajor"
+    "source":           ["../common.cmajor", "katastrofi.cmajor"]
 }
 
 
