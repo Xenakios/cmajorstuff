@@ -22,7 +22,7 @@ namespace xenakios
             return clamp(cauchy,-1.0f,1.0f);
         } else
         {
-            float temp=pow(param, 2.0f);
+            float temp = pow(param, 2.0f);
             return remap(z, 0.0f, 1.0f, -temp, temp);
         }
         return 0.0f;

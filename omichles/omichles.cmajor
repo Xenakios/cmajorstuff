@@ -17,16 +17,17 @@ graph graindelay  [[ main ]]
     input stream float<2> audio_in;
     output stream float<2> audio_out;
     
-    input value float freezeInput [[ name: "Freeze input", text: "off|on", boolean ]];
+    input value float freezeInput [[ name: "Freeze input", text: "Off|On", boolean ]];
     input value float density [[ name: "Density", min: -1.0f, max: 1.0f, init: -0.5f ]];
     input value float size [[ name: "Size", min: -1.0f, max: 1.0f, init: 0.6f ]];
+    input value float sizerand [[ name: "Size rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float shape [[ name: "Shape", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input value float position [[ name: "Time", min: 0.0f, max: 1.0f, init: 0.1f ]];
     input value float positionrand [[ name: "Time rnd", min: -1.0f, max: 1.0f, init: 0.1f ]];
     input value float pitch [[ name: "Pitch", min: -12.0f, max: 12.0f, init: 0.0f ]];
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
-    input event float panmode [[ name: "Pan", text: "center|alt L/R|sine|random uniform|random Cauchy",init:1.0f ]];
+    input event float panmode [[ name: "Pan", text: "Center|Alt L/R|Dual sine|Random uniform|Random Cauchy",init:1.0f ]];
     input value float panparam0 [[ name: "Pan param", min: 0.01f, max: 16.0f, init: 1.0f ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
@@ -37,6 +38,7 @@ graph graindelay  [[ main ]]
         density -> engine.grainrate;
         position -> engine.grainposition;
         size -> engine.grainsize;
+        sizerand -> engine.grainsizerand;
         pitch -> engine.grainpitch;
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
@@ -58,6 +60,7 @@ processor GrainDelayEngine
     input stream float grainposition;
     input stream float grainrate;
     input stream float grainsize;
+    input stream float grainsizerand;
     input stream float grainpitch;
     input stream float grainshape;
     input stream float inputFrozen;
@@ -73,6 +76,8 @@ processor GrainDelayEngine
     let maxDelayLength = 10 * 44100;
     float<2>[maxDelayLength] delayBuffer;
     wrap<maxDelayLength> writeIndex;
+    // pan mode doesn't really need to be an event since we don't need to calculate
+    // anything expensive in the callback, but was used to check out how the events work
     int panmodeValue;
     event panmode (float m)
     {
@@ -96,9 +101,10 @@ processor GrainDelayEngine
     {
         ph.isActive = true;
         ph.outPlaypos = 0;
-        // use most of the knob range in the shorter sizes
-        float sz = pow(abs(grainsize), 2.0f);
-        sz = xenakios::remap(sz,0.0f,1.0f,0.01f,1.0f); // 0.01f + 0.99f * sz;
+        float modulatedSize = grainsize + xenakios::getBipolarRandom(grainsizerand, rng);
+        modulatedSize = clamp(modulatedSize, -1.0f, 1.0f);
+        float sz = pow(abs(modulatedSize), 2.0f);
+        sz = xenakios::remap(sz, 0.0f, 1.0f, 0.01f, 1.0f);
         ph.lenSamples = int(processor.frequency * sz);
         float randomPos = grainposition + xenakios::getBipolarRandom(positionrand,rng) * 0.5f;
         randomPos = clamp(randomPos, 0.0f, 1.0f);
@@ -106,15 +112,15 @@ processor GrainDelayEngine
         let maxdelay = int(processor.frequency * 4.0);
         let delaytime = int(mindelay + randomPos * (maxdelay - mindelay));
         int offset = 0;
-        if (grainsize < 0.0)
-            offset = ph.lenSamples;
+        if (modulatedSize < 0.0) // if reversed, start from the source material end
+            offset = ph.lenSamples - 1;
         ph.sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime + offset));
         float pitch = grainpitch + xenakios::getBipolarRandom(pitchrand,rng)*12.0f;
         // allow the modulations to go a bit past the normal range of the pitch :-)
         pitch = clamp(pitch, -18.0f, 18.0f);
         let playrate = pow(2.0f, pitch / 12.0f);
         ph.playRate = playrate;
-        if (grainsize < 0.0)
+        if (modulatedSize < 0.0)
             ph.playRate = -playrate;
         int fadelen = int(ph.lenSamples / 2 * grainshape);
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
