@@ -12,38 +12,6 @@ Issues :
 -Xenakios, September 2024
 */
 
-namespace xenakios
-{
-    Type remap<Type> (Type sourceValue, Type sourceValueStart, Type sourceValueEnd, 
-                        Type destinationStart, Type destinationEnd)   
-    { 
-        return destinationStart + ((destinationEnd - destinationStart) 
-            * (sourceValue - sourceValueStart)) / (sourceValueEnd - sourceValueStart);
- 
-    }
-    // param < 0.0 produces Cauchy distributed values with increasing spread, 
-    // clamped to range -1.0 to 1.0
-    // param >= 0.0 produces uniformly distributed values with increasing spread,
-    // up to range -1.0 to 1.0
-    float getBipolarRandom(float param, std::random::RNG& rng)
-    {
-        float z = rng.getUnipolar();
-        if (param < 0.0f)
-        {
-            float temp=abs(param);
-            temp = pow(temp, 2.0f);
-            float cauchy = 0.1f * temp * tan(float(pi) * ( z - 0.5f));
-            return clamp(cauchy,-1.0f,1.0f);
-        } else
-        {
-            float temp=pow(param, 2.0f);
-            return remap(z, 0.0f, 1.0f, -temp, temp);
-        }
-        return 0.0f;
-    }
-
-}
-
 graph graindelay  [[ main ]]
 {
     input stream float<2> audio_in;

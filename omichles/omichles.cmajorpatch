@@ -8,6 +8,6 @@
     "category":         "effect",
     "manufacturer":     "Xenakios",
     "isInstrument":     false,
-    "source":           "omichles.cmajor"
+    "source":           ["../common.cmajor", "omichles.cmajor"]
 }
 
