@@ -101,12 +101,12 @@ processor GrainDelayEngine
     {
         ph.isActive = true;
         ph.outPlaypos = 0;
-        float modulatedSize = grainsize + xenakios::getBipolarRandom(grainsizerand, rng);
+        float modulatedSize = grainsize + xen::getBipolarRandom(grainsizerand, rng);
         modulatedSize = clamp(modulatedSize, -1.0f, 1.0f);
         float sz = pow(abs(modulatedSize), 2.0f);
-        sz = xenakios::remap(sz, 0.0f, 1.0f, 0.01f, 1.0f);
+        sz = xen::remap(sz, 0.0f, 1.0f, 0.01f, 1.0f);
         ph.lenSamples = int(processor.frequency * sz);
-        float randomPos = grainposition + xenakios::getBipolarRandom(positionrand,rng) * 0.5f;
+        float randomPos = grainposition + xen::getBipolarRandom(positionrand,rng) * 0.5f;
         randomPos = clamp(randomPos, 0.0f, 1.0f);
         let mindelay = int(processor.frequency * 0.05);
         let maxdelay = int(processor.frequency * 4.0);
@@ -115,7 +115,7 @@ processor GrainDelayEngine
         if (modulatedSize < 0.0) // if reversed, start from the source material end
             offset = ph.lenSamples - 1;
         ph.sourceReadPos = float64(wrap<maxDelayLength>(writeIndex - delaytime + offset));
-        float pitch = grainpitch + xenakios::getBipolarRandom(pitchrand,rng)*12.0f;
+        float pitch = grainpitch + xen::getBipolarRandom(pitchrand,rng)*12.0f;
         // allow the modulations to go a bit past the normal range of the pitch :-)
         pitch = clamp(pitch, -18.0f, 18.0f);
         let playrate = pow(2.0f, pitch / 12.0f);
@@ -138,7 +138,7 @@ processor GrainDelayEngine
         if (panmodeValue == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
         if (panmodeValue == 4)
-            panpos = xenakios::getBipolarRandom(-0.5f,rng);
+            panpos = xen::getBipolarRandom(-0.5f,rng);
         ph.pangains = std::pan_law::centre3dB(panpos);
         
     }

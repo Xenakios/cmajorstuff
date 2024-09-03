@@ -1,4 +1,4 @@
-namespace xenakios
+namespace xen
 {
     Type sign<Type>(Type in)
     {

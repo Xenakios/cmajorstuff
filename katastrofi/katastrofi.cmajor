@@ -58,9 +58,9 @@ processor LofiEngine
             if (wsmode == 1)
             {
                 float in = inputsignal[0];
-                inputsignal[0] = xenakios::sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
+                inputsignal[0] = xen::sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
                 in = inputsignal[1];
-                inputsignal[1] = xenakios::sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
+                inputsignal[1] = xen::sign(in)*2.0f*abs(in/2.0f-roundToInt(in/2.0f));
             }
             if (wsmode == 2)
             {
