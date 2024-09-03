@@ -1,1 +1,64 @@
 // Lofi effect with bitcrushing, downsampling, maybe with some twists
+graph katastrofi  [[ main ]]
+{
+    input stream float<2> audio_in;
+    output stream float<2> audio_out;
+    
+    input value float inputDrive [[ name: "Input Drive", min: -36.0f, max: 12.0f, init: 0.0f, rampFrames: 2048 ]];
+    input value float decimation [[ name: "Downsample", min: 0.0f, max: 1.0f, init: 0.0f ]];
+    input value float bitDepth [[ name: "Bit reduction", min: 0.0f, max: 1.0f, init: 0.0f ]];
+    input value float outputLevel [[ name: "Output Volume", min: -36.0f, max: 12.0f, init: -12.0f, rampFrames: 2048 ]];
+    
+    node engine = LofiEngine;
+    node lfo = std::oscillators::LFO;
+    connection
+    {
+        audio_in -> engine.audio_in;
+        inputDrive -> engine.inputDrive;
+        decimation -> engine.decimation;
+        bitDepth -> engine.bitdepth;
+        outputLevel -> engine.outputLevel;
+        engine.audio_out -> audio_out;
+    }
+}
+
+processor LofiEngine
+{
+    input stream float<2> audio_in;
+    output stream float<2> audio_out;
+    input stream float inputDrive;
+    input stream float decimation;
+    input stream float outputLevel;
+    input stream float bitdepth;
+    void main()
+    {
+        float<2> heldSamples;
+        float64 decimPhase = 0.0;
+        
+        std::random::RNG rng;
+        
+        loop
+        {
+            float shapedDecim = pow(decimation, 2.0f);
+            shapedDecim = 1.0f + 63.0f * shapedDecim;
+            float64 divlen = processor.frequency / (processor.frequency / shapedDecim);
+            
+            decimPhase += 1.0;
+            if (decimPhase >= divlen)
+            {
+                decimPhase -= divlen;
+                heldSamples = audio_in * std::levels::dBtoGain(inputDrive);
+            }
+            float numBits = 2.0f + pow(1.0f - bitdepth,2.0f) * 14.0f;
+            float numlevels = pow(2.0f,numBits);
+            float<2> crushed = (roundToInt(heldSamples[0]*numlevels)/numlevels,
+                                roundToInt(heldSamples[1]*numlevels)/numlevels);
+            float outgain = std::levels::dBtoGain(outputLevel);
+            crushed[0] = outgain * crushed[0];
+            crushed[1] = outgain * crushed[1];
+            audio_out <- crushed;
+            advance();
+        }
+    }
+}
+
