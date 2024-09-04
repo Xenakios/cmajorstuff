@@ -97,7 +97,7 @@ processor GrainDelayEngine
     PlayHead[numPlayheads] playheads;
     std::random::RNG rng;
     
-    void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos, float grainDensity)
+    void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos)
     {
         ph.isActive = true;
         ph.outPlaypos = 0;
@@ -185,7 +185,7 @@ processor GrainDelayEngine
                     {
                         if (!playheads[i].isActive)
                         {
-                            initPlayhead(playheads[i],graincounter,playbackPos,float(rate));
+                            initPlayhead(playheads[i],graincounter,playbackPos);
                             graincounter++;
                             numActivePlayheads++;
                             break;
