@@ -28,8 +28,8 @@ graph graindelay  [[ main ]]
     input value float pitchrand [[ name: "Pitch rnd", min: -1.0f, max: 1.0f, init: 0.0f ]];
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input event float panmode [[ name: "Pan", text: "Center|Alt L/R|Dual sine|Random uniform|Random Cauchy",init:1.0f ]];
-    input value float panparam0 [[ name: "Pan param", min: 0.01f, max: 16.0f, init: 1.0f ]];
     input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f, rampFrames: 2048 ]];
+    input value float limitmode [[ name: "Limit", text: "Clip|Saturate mild|Saturate hard",init:1.0f ]];
     input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f, rampFrames: 2048 ]];
     node engine = GrainDelayEngine;
     connection
@@ -43,12 +43,12 @@ graph graindelay  [[ main ]]
         freezeInput -> engine.inputFrozen;
         chance -> engine.grainChance;
         mainvol -> engine.mainvol;
-        
+        limitmode -> engine.limitmode;
         shape -> engine.grainshape;
         drywet -> engine.drywet;
         panmode -> engine.panmode;
         positionrand -> engine.positionrand;
-        panparam0 -> engine.panparam0;
+        
         pitchrand -> engine.pitchrand;
         engine.audio_out -> audio_out;
     }
@@ -66,11 +66,12 @@ processor GrainDelayEngine
     input stream float inputFrozen;
     input stream float grainChance;
     input stream float mainvol;
+    input stream float limitmode;
     input stream float drywet;
     input event float panmode;
     input stream float positionrand;
     input stream float pitchrand;
-    input stream float panparam0;
+    
     output stream float<2> audio_out;
     
     let maxDelayLength = 10 * 44100;
@@ -100,9 +101,11 @@ processor GrainDelayEngine
     float envelopeValue(float pos, float param)
     {
         float peakpos = xen::remap(param, 0.0f, 1.0f, 0.01f, 0.99f);
+        float out;
         if (pos < peakpos)
-            return xen::remap(pos, 0.0f, peakpos, 0.0f, 1.0f);
-        else return xen::remap(pos, peakpos, 1.0f, 1.0f, 0.0f);
+            out = xen::remap(pos, 0.0f, peakpos, 0.0f, 1.0f);
+        else out = xen::remap(pos, peakpos, 1.0f, 1.0f, 0.0f);
+        return pow(out,2.0f);
     }
     void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos)
     {
@@ -139,9 +142,9 @@ processor GrainDelayEngine
         if (panmodeValue == 2)
         {
             if (graincounter % 2 == 0)
-                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.0));            
+                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*0.5f*1.0));            
             if (graincounter % 2 == 1)
-                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*panparam0*1.13));
+                panpos = float(0.97 * sin(twoPi/processor.frequency*playbackPos*0.5f*1.13));
         }
         if (panmodeValue == 3)
             panpos = -1.0f+2.0f*rng.getUnipolar();
@@ -254,7 +257,10 @@ processor GrainDelayEngine
             // playheads are playing simultaneously
             float gainCompens = 1.0f - tempnumplayheads * 0.025f;
             // the tanh shaping is pretty rough, should make optional/adjustable
-            float<2> wet = (mainvol * tanh(outLeft * gainCompens),mainvol * tanh(outRight * gainCompens));
+            float<2> wet;
+            if (int(limitmode) == 1)
+                wet = (mainvol * tanh(outLeft * gainCompens),mainvol * tanh(outRight * gainCompens));
+            // else wet = (mainvol * clamp(outLeft * gainCompens,-1.0f,1.0f),mainvol * tanh(outRight * gainCompens));
             // (mainvol * tanh(outLeft * 0.5f),mainvol*tanh(outRight * 0.5f))
             audio_out <- drywet * wet + (1.0f-drywet) * dry_in;
             advance();
