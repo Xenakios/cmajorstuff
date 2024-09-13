@@ -29,8 +29,8 @@ graph graindelay  [[ main ]]
     input value float chance [[ name: "Probability", min: 0.0f, max: 1.0f, init: 1.0f ]];
     input event float panmode [[ name: "Pan", text: "Center|Alt L/R|Dual sine|Random uniform|Random Cauchy",init:1.0f ]];
     input value float panparam0 [[ name: "Pan param", min: 0.01f, max: 16.0f, init: 1.0f ]];
-    input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f ]];
-    input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f ]];
+    input value float mainvol [[ name: "Output gain", min: 0.0f, max: 1.0f, init: 0.5f, rampFrames: 2048 ]];
+    input value float drywet [[ name: "Mix", min: 0.0f, max: 1.0f, init: 1.0f, rampFrames: 2048 ]];
     node engine = GrainDelayEngine;
     connection
     {
@@ -92,11 +92,18 @@ processor GrainDelayEngine
         float playRate;
         int fadelensamples;
         float<2> pangains;
+        float envShape;
     }
     let numPlayheads = 32;
     PlayHead[numPlayheads] playheads;
     std::random::RNG rng;
-    
+    float envelopeValue(float pos, float param)
+    {
+        float peakpos = xen::remap(param, 0.0f, 1.0f, 0.01f, 0.99f);
+        if (pos < peakpos)
+            return xen::remap(pos, 0.0f, peakpos, 0.0f, 1.0f);
+        else return xen::remap(pos, peakpos, 1.0f, 1.0f, 0.0f);
+    }
     void initPlayhead(PlayHead& ph, int64 graincounter, int64 playbackPos)
     {
         ph.isActive = true;
@@ -125,6 +132,7 @@ processor GrainDelayEngine
         int fadelen = int(ph.lenSamples / 2 * grainshape);
         fadelen = clamp(fadelen,32,ph.lenSamples/2);
         ph.fadelensamples = fadelen;
+        ph.envShape = grainshape;
         float panpos = 0.0f;
         if (panmodeValue == 1)
             panpos = -1.0f + 2.0f * (graincounter % 2);
@@ -208,14 +216,18 @@ processor GrainDelayEngine
             {
                 if (rate>0.0 && playheads[i].isActive)
                 {
-                    float64 gain = 1.0;
-                    int fadelen = playheads[i].fadelensamples;
-                    int fadeoutstart = playheads[i].lenSamples - fadelen;
+                    // float64 gain = 1.0;
+                    //int fadelen = playheads[i].fadelensamples;
+                    //int fadeoutstart = playheads[i].lenSamples - fadelen;
                     int phoutpos = playheads[i].outPlaypos;
+                    float normposingrain = xen::remap(float(phoutpos),0.0f,float(playheads[i].lenSamples),0.0f,1.0f);
+                    float gain = envelopeValue(normposingrain,playheads[i].envShape);
+                    /*
                     if (phoutpos < fadelen)
                         gain = 1.0/fadelen*phoutpos;
                     if (phoutpos >= fadeoutstart)
                         gain = 1.0 - (1.0 / (fadelen-1) * (phoutpos-fadeoutstart));
+                    */
                     let sourceReadIndex0 = wrap<maxDelayLength>(floor(playheads[i].sourceReadPos));
                     let sourceReadIndex1 = wrap<maxDelayLength>(sourceReadIndex0 + 1);
                     let frac = playheads[i].sourceReadPos - int(playheads[i].sourceReadPos);
@@ -223,8 +235,8 @@ processor GrainDelayEngine
                     let vy1 = delayBuffer[sourceReadIndex1];
                     let vinterp = vy0 + (vy1 - vy0) * frac;
                     let pangains = playheads[i].pangains;
-                    outLeft += float(gain) * float(vinterp[0]) * pangains[0];
-                    outRight += float(gain) * float(vinterp[1]) * pangains[1];
+                    outLeft += gain * float(vinterp[0]) * pangains[0];
+                    outRight += gain * float(vinterp[1]) * pangains[1];
                     
                     playheads[i].sourceReadPos += playheads[i].playRate;
                     playheads[i].outPlaypos++;
